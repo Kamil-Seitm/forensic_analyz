@@ -1,0 +1,6 @@
+﻿__pycache__/
+*.pyc
+build/
+dist/
+.venv/
+fastir_analyzer.egg-info/

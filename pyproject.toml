@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fastir-analyzer"
+version = "0.1.0"
+description = "Analyze FastIR collection outputs"
+authors = [{name = "Forensic Analyst"}]
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["requests>=2.31.0"]
+
+[project.scripts]
+fastir-analyzer = "fastir_analyzer.cli:main"
+fastir-analyzer-cmd = "fastir_analyzer.cmd_runner:main"
+fastir-analyzer-gui = "fastir_analyzer.gui_app:main"
