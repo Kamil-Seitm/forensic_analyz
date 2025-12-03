@@ -1,114 +1,99 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass
 from datetime import datetime
-from typing import Dict, List
+from typing import Any, Dict, Iterable, List, Mapping, Sequence
 
-from .io import JsonLike
+
+@dataclass
+class Finding:
+    rule_id: str
+    severity: str
+    description: str
+    details: Dict[str, Any]
 
 
 @dataclass
 class Report:
-    metadata: Dict[str, str]
-    artifacts: Dict[str, List[JsonLike]]
-    findings: List[Dict[str, str]] = field(default_factory=list)
+    source: str
+    created_at_utc: str
+    artifacts_count: int
+    findings: List[Finding]
 
-    def to_dict(self) -> Dict[str, object]:
-        """Преобразовать отчёт в словарь для сериализации."""
+    def to_dict(self) -> Dict[str, Any]:
         return {
-            "metadata": self.metadata,
-            "artifact_counts": {k: len(v) for k, v in self.artifacts.items()},
-            "findings": self.findings,
+            "source": self.source,
+            "created_at_utc": self.created_at_utc,
+            "artifacts_count": self.artifacts_count,
+            "findings": [asdict(f) for f in self.findings],
         }
 
-    def to_json(self, *, indent: int = 2) -> str:
-        """Представить отчёт в виде JSON-строки."""
-        return json.dumps(self.to_dict(), indent=indent, ensure_ascii=False)
+    def to_json(self) -> str:
+        return json.dumps(self.to_dict(), ensure_ascii=False, indent=2)
 
     def to_text(self) -> str:
-        """Сформировать человекочитаемый текстовый отчёт."""
-        lines = [
-            f"Report generated at: {self.metadata.get('generated_at')}",
-            f"Source: {self.metadata.get('source')}",
-        ]
+        lines: List[str] = []
+        lines.append(f"FastIR report for: {self.source}")
+        lines.append(f"Created at (UTC): {self.created_at_utc}")
+        lines.append(f"Artifacts total: {self.artifacts_count}")
+        lines.append("")
 
-        verdict = self.metadata.get("verdict")
-        score = self.metadata.get("score")
-        verdict_text = self.metadata.get("verdict_text")
-
-        if verdict:
-            lines.append(f"Verdict: {verdict} (score={score})")
-        if verdict_text:
-            lines.append(f"Verdict details: {verdict_text}")
-
-        lines.append("Artifacts:")
-        for name, items in sorted(self.artifacts.items()):
-            lines.append(f"  - {name}: {len(items)} records")
-
-        lines.append("Findings:")
         if not self.findings:
-            lines.append("  None")
+            lines.append("Findings: none")
         else:
-            for finding in self.findings:
-                details = ", ".join(
-                    f"{k}={v}" for k, v in finding.items() if k not in {"category", "reason"}
-                )
-                lines.append(f"  - [{finding.get('category')}] {finding.get('reason')} ({details})")
+            lines.append("Findings:")
+            for f in self.findings:
+                lines.append("-" * 60)
+                lines.append(f"[{f.severity}] {f.rule_id}: {f.description}")
+                for k, v in f.details.items():
+                    lines.append(f"  {k}: {v}")
+        lines.append("")
+        return "\n".join(lines)
 
-        return "
-".join(lines)
 
+def build_report(
+    source: str,
+    artifacts: Mapping[str, Any],
+    findings: Sequence[Mapping[str, Any]],
+) -> Report:
+    """Построить объект отчёта из артефактов и срабатываний правил."""
 
-def classify_risk(findings: List[Dict[str, str]]) -> Dict[str, object]:
-    """Очень простой скоринг: даёт итоговый вердикт по списку находок."""
-    score = 0
-    reasons: List[str] = []
+    parsed_findings: List[Finding] = []
+    for item in findings:
+        # ожидаем словарь, но на всякий пожарный используем get(...)
+        rule_id = str(item.get("id", ""))
+        severity = str(item.get("severity", "info"))
+        description = str(item.get("description", ""))
+        details_raw = item.get("details", {})
 
-    for f in findings:
-        cat = (f.get("category") or "").lower()
-        reason = f.get("reason") or ""
-        vt = (f.get("virustotal") or f.get("vt_status") or "").lower()
-
-        if "flagged" in vt:
-            score += 5
-            reasons.append(f"{cat}: VirusTotal flagged object ({reason})")
-        elif cat in {"process", "network"}:
-            score += 4
-            reasons.append(f"{cat}: {reason}")
-        elif cat in {"autorun", "service"}:
-            score += 2
-            reasons.append(f"{cat}: {reason}")
+        if not isinstance(details_raw, dict):
+            details: Dict[str, Any] = {"value": details_raw}
         else:
-            score += 1
-            reasons.append(f"{cat}: {reason}")
+            details = details_raw
 
-    if score >= 8:
-        verdict = "compromised"
-        verdict_text = "Высокая вероятность компрометации / бекдора"
-    elif score >= 3:
-        verdict = "suspicious"
-        verdict_text = "Есть подозрительные артефакты, требуется более тщательный анализ"
-    else:
-        verdict = "clean"
-        verdict_text = "Явных признаков заражения по текущим эвристикам не обнаружено"
+        parsed_findings.append(
+            Finding(
+                rule_id=rule_id,
+                severity=severity,
+                description=description,
+                details=details,
+            )
+        )
 
-    return {
-        "verdict": verdict,
-        "verdict_text": verdict_text,
-        "score": score,
-        "top_reasons": reasons[:5],
-    }
+    # грубый подсчёт количества артефактов
+    artifacts_count = 0
+    for value in artifacts.values():
+        if isinstance(value, Iterable) and not isinstance(value, (str, bytes, dict)):
+            artifacts_count += len(list(value))
+        else:
+            artifacts_count += 1
 
+    created_at = datetime.utcnow().isoformat(timespec="seconds") + "Z"
 
-def build_report(source: str, artifacts: Dict[str, List[JsonLike]], findings: List[Dict[str, str]]) -> Report:
-    """Сконструировать объект отчёта с таймштампом и итоговым вердиктом."""
-    summary = classify_risk(findings)
-    metadata = {
-        "generated_at": datetime.utcnow().isoformat() + "Z",
-        "source": source,
-        "verdict": summary["verdict"],
-        "verdict_text": summary["verdict_text"],
-        "score": str(summary["score"]),
-    }
-    return Report(metadata=metadata, artifacts=artifacts, findings=findings)
+    return Report(
+        source=source,
+        created_at_utc=created_at,
+        artifacts_count=artifacts_count,
+        findings=parsed_findings,
+    )

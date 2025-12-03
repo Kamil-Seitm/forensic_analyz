@@ -1,6 +1,27 @@
-п»ї__pycache__/
-*.pyc
+# Python bytecode
+__pycache__/
+*.py[cod]
+*.class
+
+# Venv / conda env in project folder (если вдруг сделаешь)
+.venv/
+venv/
+env/
+
+# Build artifacts
 build/
 dist/
-.venv/
-fastir_analyzer.egg-info/
+*.egg-info/
+
+# IDE
+.vscode/
+.idea/
+*.code-workspace
+
+# Временные файлы / логи
+*.log
+*.tmp
+
+# Вывод FastIR из GUI (сюда будет писать fastir_usb)
+bin/fastir_usb/
+fastir_usb/

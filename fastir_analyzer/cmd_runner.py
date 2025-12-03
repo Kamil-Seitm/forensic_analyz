@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from .orchestrator import collect_and_analyze
+from fastir_analyzer.orchestrator import collect_and_analyze
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:

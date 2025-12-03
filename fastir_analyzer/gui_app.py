@@ -5,7 +5,7 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox
 
-from .orchestrator import collect_and_analyze
+from fastir_analyzer.orchestrator import collect_and_analyze
 
 
 class FastIRGui:

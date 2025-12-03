@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import csv
+# Поднимаем лимит размера одного поля CSV (по умолчанию 128 КБ)
+csv.field_size_limit(10 * 1024 * 1024)  # 10 МБ, можно больше, если захочешь
 import json
 import zipfile
 from pathlib import Path
