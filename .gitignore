@@ -25,3 +25,5 @@ dist/
 # Вывод FastIR из GUI (сюда будет писать fastir_usb)
 bin/fastir_usb/
 fastir_usb/
+$null
+
